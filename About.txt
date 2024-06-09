@@ -1,0 +1,15 @@
+Name: Ritchey&AI Markdown File To HTML File
+Implementation: 1
+Version: WIP0.1
+Long Identifier: Ritchey&AI Markdown File To HTML File i1 vWIP0.1
+Short Identifier: R&AIMFTHFi1vWIP0.1
+Description: An EXPERIMENTAL program for converting a Markdown file to an HTML file. Only select Markdown elements are supported. Currently the programe is NOT fully working. Read the notes before using!
+History:
+ - Project started June 8, 2024.
+ - Version WIP0.1 completed June 8, 2024.
+Author: James Daniel Marrs Ritchey
+Licensing: As is, this project is licensed under the CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/legalcode). However, if you compile this project's code, the compiler may bring in, or link to, foreign materials (e.g., headers, libraries, etc), which have their own licensing terms. As such, compiled binaries may have different licensing terms. It is your responsibility to determine this, if you compile the code.
+Notes:
+ - This project was developed in part by using the tool GitHub Copilot Business.
+ - I only know some basics of Java, so vet the code before attempting to use/run it! For me, making this project was more about learning how to use AI tools than the actual project itself.
+ - This program seems to be partialy working as intended, but has had very limited testing. It is still considered experimental at this stage, so don't be surprised if it doesn't work correctly.

@@ -1,0 +1,647 @@
+jamesdanielmarrsritchey: Here is the full program code: ```import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class MarkdownToHtmlConverter {
+    private static final Pattern LINK_PATTERN = Pattern.compile("\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern IMAGE_PATTERN = Pattern.compile("!\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*(.*?)\\*\\*");
+    private static final Pattern ITALIC_PATTERN = Pattern.compile("\\*(.*?)\\*");
+    private static final Pattern ORDERED_LIST_PATTERN = Pattern.compile("^\\d+\\.\\s+(.*)");
+    private static final Pattern UNORDERED_LIST_PATTERN = Pattern.compile("^\\*\\s+(.*)");
+    private static final Pattern BLOCKQUOTE_PATTERN = Pattern.compile("^>\\s+(.*)");
+    private static final Pattern HEADING_PATTERN = Pattern.compile("^(#{1,6})\\s+(.*)");
+    private static final Pattern CODE_BLOCK_PATTERN = Pattern.compile("^```(.*)");
+
+    public static String convertMarkdownToHtml(String markdownFilePath) {
+        StringBuilder html = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(markdownFilePath))) {
+            String line;
+            boolean inOrderedList = false;
+            boolean inUnorderedList = false;
+            boolean inBlockquote = false;
+            boolean inCodeBlock = false;
+            while ((line = reader.readLine()) != null) {
+                Matcher orderedListMatcher = ORDERED_LIST_PATTERN.matcher(line);
+                Matcher unorderedListMatcher = UNORDERED_LIST_PATTERN.matcher(line);
+                Matcher blockquoteMatcher = BLOCKQUOTE_PATTERN.matcher(line);
+                Matcher headingMatcher = HEADING_PATTERN.matcher(line);
+                Matcher codeBlockMatcher = CODE_BLOCK_PATTERN.matcher(line);
+                if (orderedListMatcher.matches()) {
+                    if (!inOrderedList) {
+                        html.append("<ol>\n");
+                        inOrderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(orderedListMatcher.group(1))).append("</li>\n");
+                } else if (unorderedListMatcher.matches()) {
+                    if (!inUnorderedList) {
+                        html.append("<ul>\n");
+                        inUnorderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(unorderedListMatcher.group(1))).append("</li>\n");
+                } else if (blockquoteMatcher.matches()) {
+                    if (!inBlockquote) {
+                        html.append("<blockquote>\n");
+                        inBlockquote = true;
+                    }
+                    html.append(convertAll(blockquoteMatcher.group(1))).append("<br>\n");
+                } else if (headingMatcher.matches()) {
+                    int level = headingMatcher.group(1).length();
+                    html.append("<h").append(level).append(">")
+                        .append(convertAll(headingMatcher.group(2)))
+                        .append("</h").append(level).append(">\n");
+                } else if (codeBlockMatcher.matches()) {
+                    if (inCodeBlock) {
+                        html.append("</code></pre>\n");
+                        inCodeBlock = false;
+                    } else {
+                        html.append("<pre><code>\n");
+                        inCodeBlock = true;
+                    }
+                } else {
+                    if (inOrderedList) {
+                        html.append("</ol>\n");
+                        inOrderedList = false;
+                    }
+                    if (inUnorderedList) {
+                        html.append("</ul>\n");
+                        inUnorderedList = false;
+                    }
+                    if (inBlockquote) {
+                        html.append("</blockquote>\n");
+                        inBlockquote = false;
+                    }
+                    if (inCodeBlock) {
+                        html.append(line).append("\n");
+                    } else {
+                        html.append("<p>").append(convertAll(line)).append("</p>\n");
+                    }
+                }
+            }
+
+            if (inOrderedList) {
+                html.append("</ol>\n");
+            }
+            if (inUnorderedList) {
+                html.append("</ul>\n");
+            }
+            if (inBlockquote) {
+                html.append("</blockquote>\n");
+            }
+            if (inCodeBlock) {
+                html.append("</code></pre>\n");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading markdown file", e);
+        }
+        return html.toString();
+    }
+
+    private static String convertAll(String text) {
+        String result = convertLinks(text);
+        result = convertImages(result);
+        result = convertBold(result);
+        return convertItalic(result);
+    }
+
+    private static String convertLinks(String text) {
+        Matcher matcher = LINK_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<a href=\"" + matcher.group(2) + "\">" + matcher.group(1) + "</a>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertImages(String text) {
+        Matcher matcher = IMAGE_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<img src=\"" + matcher.group(2) + "\" alt=\"" + matcher.group(1) + "\">");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertBold(String text) {
+        Matcher matcher = BOLD_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<b>" + matcher.group(1) + "</b>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertItalic(String text) {
+        Matcher matcher = ITALIC_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<i>" + matcher.group(1) + "</i>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    public static void main(String[] args) {
+        String sourceFilePath = null;
+        String destinationFilePath = null;
+        for (int i = 0; i < args.length; i++) {
+            if ("--source_file".equals(args[i]) && i + 1 < args.length) {
+                sourceFilePath = args[i + 1];
+            } else if ("--destination_file".equals(args[i]) && i + 1 < args.length) {
+                destinationFilePath = args[i + 1];
+            }
+        }
+        if (sourceFilePath == null) {
+            System.err.println("Please specify the source file with --source_file");
+            System.exit(1);
+        }
+        if (destinationFilePath == null) {
+            System.err.println("Please specify the destination file with --destination_file");
+            System.exit(1);
+        }
+        try {
+            String markdown = new String(Files.readAllBytes(Paths.get(sourceFilePath)));
+            String html = convertMarkdownToHtml(markdown);
+            Files.write(Paths.get(destinationFilePath), html.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            System.err.println("Error reading source file or writing to destination file: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+}
+
+GitHub Copilot: This Java program is a Markdown to HTML converter. It reads a Markdown file, converts it to HTML, and writes the HTML to a specified file. Here's a brief overview of how it works:
+
+1. It defines several regular expressions to match different Markdown syntaxes, such as links, images, bold and italic text, ordered and unordered lists, blockquotes, headings, and code blocks.
+
+2. The `convertMarkdownToHtml` method reads the Markdown file line by line. For each line, it checks if it matches any of the defined patterns. If it does, it converts the Markdown syntax to the corresponding HTML syntax and appends it to a StringBuilder.
+
+3. The `convertAll` method is used to convert links, images, bold and italic text within a line of text.
+
+4. The `main` method parses command-line arguments to get the source and destination file paths. It reads the source file into a string, converts it to HTML, and writes the HTML to the destination file.
+
+Note: The program assumes that the input Markdown file is well-formed. If the input file contains Markdown syntax that is not covered by the defined patterns, or if the syntax is used incorrectly, the program may not produce the expected output.
+
+jamesdanielmarrsritchey: Do you see any mistakes in the code?
+
+GitHub Copilot: The code seems to be well-written and should work as expected for most standard Markdown files. However, there are a few potential issues that could arise:
+
+1. **Nested Markdown Syntax**: The code does not handle nested Markdown syntax. For example, if you have a link within bold text, it will not be correctly converted to HTML.
+
+2. **Code Block Handling**: The code block handling is a bit simplistic. It doesn't handle the language specification that can follow the opening "```" in a Markdown code block. Also, it doesn't escape HTML entities within the code block, which could lead to incorrect rendering if the code block contains characters that have special meaning in HTML.
+
+3. **Line Breaks**: In Markdown, a line break is indicated by two or more spaces at the end of a line. This code does not handle that case.
+
+4. **Reading the Entire File into Memory**: In the `main` method, the entire source file is read into a string with `Files.readAllBytes`. This could be a problem for very large files, as it could lead to an `OutOfMemoryError`.
+
+5. **Error Handling**: The error handling could be improved. For example, if an `IOException` occurs while reading the source file or writing to the destination file, the program prints an error message and exits with a status code of 1. However, it does not print the stack trace of the exception, which could make it harder to debug the problem.
+
+6. **Command Line Argument Parsing**: The command line argument parsing is a bit simplistic. It does not handle the case where the user provides the same argument multiple times, or where the argument value is missing. A more robust solution would be to use a library for command line argument parsing, such as Apache Commons CLI or JCommander.
+
+jamesdanielmarrsritchey: Currently it has errors reading the file due to the use of Markdown.
+
+GitHub Copilot: The issue seems to be with the way the file is being read in the `main` method. The `Files.readAllBytes` method is being used to read the entire file into a string, which is then passed to the `convertMarkdownToHtml` method. However, the `convertMarkdownToHtml` method is expecting a file path, not the contents of the file.
+
+Here's how you can fix this:
+
+Replace this line in the `main` method:
+
+```java
+String markdown = new String(Files.readAllBytes(Paths.get(sourceFilePath)));
+```
+
+with:
+
+```java
+String markdown = sourceFilePath;
+```
+
+And then, in the `convertMarkdownToHtml` method, replace this line:
+
+```java
+try (BufferedReader reader = new BufferedReader(new FileReader(markdownFilePath))) {
+```
+
+with:
+
+```java
+try (BufferedReader reader = Files.newBufferedReader(Paths.get(markdownFilePath), StandardCharsets.UTF_8)) {
+```
+
+This way, you're passing the file path to the `convertMarkdownToHtml` method, and then opening the file for reading within that method.
+
+jamesdanielmarrsritchey: Add these changes to the full program code.
+
+GitHub Copilot: Here's the updated code with the changes:
+
+```java
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class MarkdownToHtmlConverter {
+    private static final Pattern LINK_PATTERN = Pattern.compile("\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern IMAGE_PATTERN = Pattern.compile("!\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*(.*?)\\*\\*");
+    private static final Pattern ITALIC_PATTERN = Pattern.compile("\\*(.*?)\\*");
+    private static final Pattern ORDERED_LIST_PATTERN = Pattern.compile("^\\d+\\.\\s+(.*)");
+    private static final Pattern UNORDERED_LIST_PATTERN = Pattern.compile("^\\*\\s+(.*)");
+    private static final Pattern BLOCKQUOTE_PATTERN = Pattern.compile("^>\\s+(.*)");
+    private static final Pattern HEADING_PATTERN = Pattern.compile("^(#{1,6})\\s+(.*)");
+    private static final Pattern CODE_BLOCK_PATTERN = Pattern.compile("^```(.*)");
+
+    public static String convertMarkdownToHtml(String markdownFilePath) {
+        StringBuilder html = new StringBuilder();
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(markdownFilePath), StandardCharsets.UTF_8)) {
+            String line;
+            boolean inOrderedList = false;
+            boolean inUnorderedList = false;
+            boolean inBlockquote = false;
+            boolean inCodeBlock = false;
+            while ((line = reader.readLine()) != null) {
+                Matcher orderedListMatcher = ORDERED_LIST_PATTERN.matcher(line);
+                Matcher unorderedListMatcher = UNORDERED_LIST_PATTERN.matcher(line);
+                Matcher blockquoteMatcher = BLOCKQUOTE_PATTERN.matcher(line);
+                Matcher headingMatcher = HEADING_PATTERN.matcher(line);
+                Matcher codeBlockMatcher = CODE_BLOCK_PATTERN.matcher(line);
+                if (orderedListMatcher.matches()) {
+                    if (!inOrderedList) {
+                        html.append("<ol>\n");
+                        inOrderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(orderedListMatcher.group(1))).append("</li>\n");
+                } else if (unorderedListMatcher.matches()) {
+                    if (!inUnorderedList) {
+                        html.append("<ul>\n");
+                        inUnorderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(unorderedListMatcher.group(1))).append("</li>\n");
+                } else if (blockquoteMatcher.matches()) {
+                    if (!inBlockquote) {
+                        html.append("<blockquote>\n");
+                        inBlockquote = true;
+                    }
+                    html.append(convertAll(blockquoteMatcher.group(1))).append("<br>\n");
+                } else if (headingMatcher.matches()) {
+                    int level = headingMatcher.group(1).length();
+                    html.append("<h").append(level).append(">")
+                        .append(convertAll(headingMatcher.group(2)))
+                        .append("</h").append(level).append(">\n");
+                } else if (codeBlockMatcher.matches()) {
+                    if (inCodeBlock) {
+                        html.append("</code></pre>\n");
+                        inCodeBlock = false;
+                    } else {
+                        html.append("<pre><code>\n");
+                        inCodeBlock = true;
+                    }
+                } else {
+                    if (inOrderedList) {
+                        html.append("</ol>\n");
+                        inOrderedList = false;
+                    }
+                    if (inUnorderedList) {
+                        html.append("</ul>\n");
+                        inUnorderedList = false;
+                    }
+                    if (inBlockquote) {
+                        html.append("</blockquote>\n");
+                        inBlockquote = false;
+                    }
+                    if (inCodeBlock) {
+                        html.append(line).append("\n");
+                    } else {
+                        html.append("<p>").append(convertAll(line)).append("</p>\n");
+                    }
+                }
+            }
+
+            if (inOrderedList) {
+                html.append("</ol>\n");
+            }
+            if (inUnorderedList) {
+                html.append("</ul>\n");
+            }
+            if (inBlockquote) {
+                html.append("</blockquote>\n");
+            }
+            if (inCodeBlock) {
+                html.append("</code></pre>\n");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading markdown file", e);
+        }
+        return html.toString();
+    }
+
+    private static String convertAll(String text) {
+        String result = convertLinks(text);
+        result = convertImages(result);
+        result = convertBold(result);
+        return convertItalic(result);
+    }
+
+    private static String convertLinks(String text) {
+        Matcher matcher = LINK_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<a href=\"" + matcher.group(2) + "\">" + matcher.group(1) + "</a>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertImages(String text) {
+        Matcher matcher = IMAGE_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<img src=\"" + matcher.group(2) + "\" alt=\"" + matcher.group(1) + "\">");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertBold(String text) {
+        Matcher matcher = BOLD_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<b>" + matcher.group(1) + "</b>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertItalic(String text) {
+        Matcher matcher = ITALIC_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<i>" + matcher.group(1) + "</i>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    public static void main(String[] args) {
+        String sourceFilePath = null;
+        String destinationFilePath = null;
+        for (int i = 0; i < args.length; i++) {
+            if ("--source_file".equals(args[i]) && i + 1 < args.length) {
+                sourceFilePath = args[i + 1];
+            } else if ("--destination_file".equals(args[i]) && i + 1 < args.length) {
+                destinationFilePath = args[i + 1];
+            }
+        }
+        if (sourceFilePath == null) {
+            System.err.println("Please specify the source file with --source_file");
+            System.exit(1);
+        }
+        if (destinationFilePath == null) {
+            System.err.println("Please specify the destination file with --destination_file");
+            System.exit(1);
+        }
+        try {
+            String html = convertMarkdownToHtml(sourceFilePath);
+            Files.write(Paths.get(destinationFilePath), html.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            System.err.println("Error reading source file or writing to destination file: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+}
+```
+
+This should resolve the issue with reading the file.
+
+jamesdanielmarrsritchey: When converting to HTML, add the proper elements to make a complete HTML document.
+
+GitHub Copilot: Sure, to make a complete HTML document, we need to add the `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>` tags. Here's how you can modify the `convertMarkdownToHtml` method to do this:
+
+```java
+public static String convertMarkdownToHtml(String markdownFilePath) {
+    StringBuilder html = new StringBuilder();
+    html.append("<!DOCTYPE html>\n");
+    html.append("<html>\n");
+    html.append("<head>\n");
+    html.append("<meta charset=\"UTF-8\">\n");
+    html.append("<title>Markdown to HTML</title>\n");
+    html.append("</head>\n");
+    html.append("<body>\n");
+
+    // ... existing code ...
+
+    html.append("</body>\n");
+    html.append("</html>\n");
+    return html.toString();
+}
+```
+
+This will create a basic HTML document with a title of "Markdown to HTML". If you want to set a different title, you can modify the `<title>` tag accordingly.
+
+jamesdanielmarrsritchey: Add this suggestion to the full program code.
+
+GitHub Copilot: Here's the updated code with the changes:
+
+```java
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class MarkdownToHtmlConverter {
+    private static final Pattern LINK_PATTERN = Pattern.compile("\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern IMAGE_PATTERN = Pattern.compile("!\\[(.*?)\\]\\((.*?)\\)");
+    private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*(.*?)\\*\\*");
+    private static final Pattern ITALIC_PATTERN = Pattern.compile("\\*(.*?)\\*");
+    private static final Pattern ORDERED_LIST_PATTERN = Pattern.compile("^\\d+\\.\\s+(.*)");
+    private static final Pattern UNORDERED_LIST_PATTERN = Pattern.compile("^\\*\\s+(.*)");
+    private static final Pattern BLOCKQUOTE_PATTERN = Pattern.compile("^>\\s+(.*)");
+    private static final Pattern HEADING_PATTERN = Pattern.compile("^(#{1,6})\\s+(.*)");
+    private static final Pattern CODE_BLOCK_PATTERN = Pattern.compile("^```(.*)");
+
+    public static String convertMarkdownToHtml(String markdownFilePath) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html>\n");
+        html.append("<head>\n");
+        html.append("<meta charset=\"UTF-8\">\n");
+        html.append("<title>Markdown to HTML</title>\n");
+        html.append("</head>\n");
+        html.append("<body>\n");
+
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(markdownFilePath), StandardCharsets.UTF_8)) {
+            String line;
+            boolean inOrderedList = false;
+            boolean inUnorderedList = false;
+            boolean inBlockquote = false;
+            boolean inCodeBlock = false;
+            while ((line = reader.readLine()) != null) {
+                Matcher orderedListMatcher = ORDERED_LIST_PATTERN.matcher(line);
+                Matcher unorderedListMatcher = UNORDERED_LIST_PATTERN.matcher(line);
+                Matcher blockquoteMatcher = BLOCKQUOTE_PATTERN.matcher(line);
+                Matcher headingMatcher = HEADING_PATTERN.matcher(line);
+                Matcher codeBlockMatcher = CODE_BLOCK_PATTERN.matcher(line);
+                if (orderedListMatcher.matches()) {
+                    if (!inOrderedList) {
+                        html.append("<ol>\n");
+                        inOrderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(orderedListMatcher.group(1))).append("</li>\n");
+                } else if (unorderedListMatcher.matches()) {
+                    if (!inUnorderedList) {
+                        html.append("<ul>\n");
+                        inUnorderedList = true;
+                    }
+                    html.append("<li>").append(convertAll(unorderedListMatcher.group(1))).append("</li>\n");
+                } else if (blockquoteMatcher.matches()) {
+                    if (!inBlockquote) {
+                        html.append("<blockquote>\n");
+                        inBlockquote = true;
+                    }
+                    html.append(convertAll(blockquoteMatcher.group(1))).append("<br>\n");
+                } else if (headingMatcher.matches()) {
+                    int level = headingMatcher.group(1).length();
+                    html.append("<h").append(level).append(">")
+                        .append(convertAll(headingMatcher.group(2)))
+                        .append("</h").append(level).append(">\n");
+                } else if (codeBlockMatcher.matches()) {
+                    if (inCodeBlock) {
+                        html.append("</code></pre>\n");
+                        inCodeBlock = false;
+                    } else {
+                        html.append("<pre><code>\n");
+                        inCodeBlock = true;
+                    }
+                } else {
+                    if (inOrderedList) {
+                        html.append("</ol>\n");
+                        inOrderedList = false;
+                    }
+                    if (inUnorderedList) {
+                        html.append("</ul>\n");
+                        inUnorderedList = false;
+                    }
+                    if (inBlockquote) {
+                        html.append("</blockquote>\n");
+                        inBlockquote = false;
+                    }
+                    if (inCodeBlock) {
+                        html.append(line).append("\n");
+                    } else {
+                        html.append("<p>").append(convertAll(line)).append("</p>\n");
+                    }
+                }
+            }
+
+            if (inOrderedList) {
+                html.append("</ol>\n");
+            }
+            if (inUnorderedList) {
+                html.append("</ul>\n");
+            }
+            if (inBlockquote) {
+                html.append("</blockquote>\n");
+            }
+            if (inCodeBlock) {
+                html.append("</code></pre>\n");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading markdown file", e);
+        }
+
+        html.append("</body>\n");
+        html.append("</html>\n");
+        return html.toString();
+    }
+
+    private static String convertAll(String text) {
+        String result = convertLinks(text);
+        result = convertImages(result);
+        result = convertBold(result);
+        return convertItalic(result);
+    }
+
+    private static String convertLinks(String text) {
+        Matcher matcher = LINK_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<a href=\"" + matcher.group(2) + "\">" + matcher.group(1) + "</a>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertImages(String text) {
+        Matcher matcher = IMAGE_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<img src=\"" + matcher.group(2) + "\" alt=\"" + matcher.group(1) + "\">");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertBold(String text) {
+        Matcher matcher = BOLD_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<b>" + matcher.group(1) + "</b>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String convertItalic(String text) {
+        Matcher matcher = ITALIC_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(sb, "<i>" + matcher.group(1) + "</i>");
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    public static void main(String[] args) {
+        String sourceFilePath = null;
+        String destinationFilePath = null;
+        for (int i = 0; i < args.length; i++) {
+            if ("--source_file".equals(args[i]) && i + 1 < args.length) {
+                sourceFilePath = args[i + 1];
+            } else if ("--destination_file".equals(args[i]) && i + 1 < args.length) {
+                destinationFilePath = args[i + 1];
+            }
+        }
+        if (sourceFilePath == null) {
+            System.err.println("Please specify the source file with --source_file");
+            System.exit(1);
+        }
+        if (destinationFilePath == null) {
+            System.err.println("Please specify the destination file with --destination_file");
+            System.exit(1);
+        }
+        try {
+            String html = convertMarkdownToHtml(sourceFilePath);
+            Files.write(Paths.get(destinationFilePath), html.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            System.err.println("Error reading source file or writing to destination file: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+}
+```
+
+This should create a complete HTML document from the Markdown file.
